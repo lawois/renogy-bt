@@ -11,7 +11,50 @@ python3 -m pip install -r requirements.txt
 This library should work on any modern Linux/Windows/Mac platforms that supports [Bleak](https://github.com/hbldh/bleak). 
 
 ## Example
-Each device needs a separate [config.ini](https://github.com/cyrils/renogy-bt1/blob/main/config.ini) file. Update  config file with correct values for `mac_addr`, `alias` and `type` and run the following command:
+Each device needs a `config.ini` file. Update the config file with correct values for your device's `mac_addr` (Bluetooth MAC address), `alias` (Bluetooth name, optional if MAC is correct), `type` (device model type), and `device_id` (Modbus ID, usually 1, 255, or specific for hub setups).
+
+Below is a minimal example structure for `config.ini`:
+
+```ini
+[device]
+# Bluetooth MAC address of your BT-1/BT-2 module or built-in BLE device
+# On Linux, this is often case-sensitive. Use the exact address from discovery.
+mac_addr = XX:XX:XX:XX:XX:XX
+# Bluetooth alias/name of your device (optional if MAC is correct, but helpful)
+alias = BT-TH-B00FXXXX
+# Device type. See "Compatibility" section for common types.
+# Examples: RNG_CTRL (Rover/Wanderer), RNG_BATT (Smart Battery), RNG_INVT (Inverter)
+type = RNG_CTRL
+# Modbus ID of the device. Usually 1 or 255 if directly connected.
+# For devices on a Renogy Hub, this will be specific (e.g., 48 for a battery).
+device_id = 1
+# Number of connection retries if the initial attempt fails. (Default: 3)
+connect_retries = 3
+# Delay in seconds between connection retries. (Default: 5)
+connect_retry_delay = 5
+
+[data]
+# Enable continuous polling of data. If false, script runs once.
+enable_polling = false
+# Interval in seconds for polling data (if enable_polling is true).
+poll_interval = 60
+# Comma-separated list of fields to include in MQTT/Remote logs. Leave empty for all.
+# Example: fields = battery_voltage,pv_power,charging_status
+fields =
+# Temperature unit for output: C (Celsius) or F (Fahrenheit).
+temperature_unit = C
+# Logging level for the application. Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = INFO
+
+# --- Other sections for logging (mqtt, remote_logging, pvoutput) ---
+# [mqtt]
+# enabled = false
+# ...
+```
+
+The new `connect_retries`, `connect_retry_delay`, and `log_level` options provide more control over connection behavior and logging verbosity.
+
+After setting up your `config.ini`, run the example script:
 
 ```sh
 python3 ./example.py config.ini
@@ -23,45 +66,105 @@ The library will automatically list possible compatible devices discovered nearb
 
 **Output**
 
-```
-INFO:root:Init RoverClient: BT-TH-B00FXXXX => 80:6F:B0:0F:XX:XX
-INFO:root:Adapter status - Powered: True
-INFO:root:Starting discovery...
-INFO:root:Devices found: 5
-INFO:root:Found matching device BT-TH-B00FXXXX => [80:6F:B0:0F:XX:XX]
-INFO:root:[80:6f:b0:0f:XX:XX] Discovered, alias = BT-TH-B00FXXXX
-INFO:root:[80:6F:B0:0F:XX:XX] Connected
-INFO:root:[80:6F:B0:0F:XX:XX] Resolved services
-INFO:root:found write characteristic 0000ffd1-0000-1000-8000-00805f9b34fb
-INFO:root:subscribed to notification 0000fff1-0000-1000-8000-00805f9b34fb
-INFO:root:resolved services
-INFO:root:reading params
-DEBUG:root:create_read_request 256 => [255, 3, 1, 0, 0, 34, 209, 241]
-INFO:root:characteristic_write_value_succeeded
-INFO:root:characteristic_enable_notifications_succeeded
-INFO:root:on_data_received: response for read operation
-DEBUG:root:BT-TH-B00FXXXX => {'function': 'READ', 'model': 'RNG-CTRL-WND10', 'battery_percentage': 87, 'battery_voltage': 12.9, 'battery_current': 2.58, 'battery_temperature': 25, 'controller_temperature': 33, 'load_status': 'off', 'load_voltage': 0.0,'load_current': 0.0, 'load_power': 0, 'pv_voltage': 17.1, 'pv_current': 2.04, 'pv_power': 35, 'max_charging_power_today': 143, 'max_discharging_power_today': 0, 'charging_amp_hours_today': 34, 'discharging_amp_hours_today': 34, 'power_generation_today': 432, 'power_consumption_today': 0, 'power_generation_total': 426038, 'charging_status': 'mppt', 'battery_type': 'lithium', 'device_id': 97}
-INFO:root:Exit: Disconnecting device: BT-TH-B00FXXXX [80:6F:B0:0F:XX:XX]
-```
-```
-# Rover historical data (7 days summary)
-DEBUG:root:BT-TH-30A3XXXX => {'function': 'READ', 'daily_power_generation': [1754, 1907, 1899, 1804, 1841, 1630, 1344],'daily_charge_ah': [135, 147, 147, 139, 142, 125, 102], 'daily_max_power': [234, 344, 360, 335, 331, 307, 290]}
-```
-```
-# Battery output
-DEBUG:root:BT-TH-161EXXXX => {'function': 'READ', 'model': 'RBT100LFP12S-G', 'cell_count': 4, 'cell_voltage_0': 3.6, 'cell_voltage_1': 3.6, 'cell_voltage_2': 3.6, 'cell_voltage_3': 3.6, 'sensor_count': 4, 'temperature_0': 21.0, 'temperature_1': 21.0, 'temperature_2': 21.0, 'temperature_3': 21.0, 'current': 1.4, 'voltage': 14.5, 'remaining_charge': 99.941, 'capacity': 100.0, 'device_id': 48} 
-```
-```
-# Inverter output
-DEBUG:root:BTRIC13400XXXX => {'function': 'READ', 'input_voltage': 124.9, 'input_current': 2.2, 'output_voltage': 124.9, 'output_current': 1.19, 'output_frequency': 59.97, 'battery_voltage': 14.4, 'temperature': 30.0, 'input_frequency': 59.97, 'device_id': 32, 'model': 'RIV1230RCH-SPS', 'battery_percentage': 100, 'charging_current': 0.7, 'solar_voltage': 0.0, 'solar_current': 0.0, 'solar_power': 0, 'charging_status': 'deactivated', 'charging_power': 10, 'load_curent': 1.2, 'load_active_power': 108, 'load_apparent_power': 150, 'line_charging_current': 0.0, 'load_percentage': 5, '__device': 'BTRIC13400XXXX', '__client': 'InverterClient'}
-```
+The exact log output will depend on your device type and the `log_level` set in `config.ini`.
+With `log_level = INFO` or `DEBUG`, you should see messages similar to this (timestamps omitted for brevity):
 
 ```
-# DC Charger output
-INFO:root:BT-TH-XXXXXXXX => {'function': 'READ', 'model': 'RBC50D1S-G1', 'device_id': 96, 'battery_percentage': 100, 'battery_voltage': 13.2, 'combined_charge_current': 0.0, 'controller_temperature': 18, 'battery_temperature': 25, 'alternator_voltage': 12.9, 'alternator_current': 0.0, 'alternator_power': 0, 'pv_voltage': 0.0, 'pv_current': 0.0, 'pv_power': 0, 'battery_min_voltage_today': 13.2, 'battery_max_voltage_today': 13.3, 'battery_max_current_today': 17.02, 'max_charging_power_today': 238, 'charging_amp_hours_today': 25, 'power_generation_today': 336, 'total_working_days': 703, 'count_battery_overdischarged': 0, 'count_battery_fully_charged': 1435, 'battery_ah_total_accumulated': 5607, 'power_generation_total': 76580, 'charging_status': 'current limiting', 'error': 'battery_over_discharge', 'battery_type': None, '__device': 'BT-TH-XXXXXXXX', '__client': 'DCChargerClient'}
+INFO:example:Script started. Log level set to INFO.
+INFO:example:Using configuration file: config.ini
+INFO:renogybt.ConfigManager:Configuration file 'config.ini' loaded successfully.
+INFO:renogybt.ConfigManager:Configuration file validation successful.
+INFO:example:Initializing Renogy BT client...
+INFO:renogybt.RoverClient:Initializing RoverClient for device 'My Rover' (XX:XX:XX:XX:XX:XX)
+INFO:example:Device type specified in configuration: 'RNG_CTRL'
+INFO:example:Starting client for device type: 'RNG_CTRL'...
+INFO:renogybt.BaseClient:Starting client for 'My Rover'...
+INFO:renogybt.BaseClient:Attempting to connect to 'My Rover' (XX:XX:XX:XX:XX:XX)...
+DEBUG:renogybt.BaseClient:Initializing BLEManager for 'My Rover' (XX:XX:XX:XX:XX:XX)
+DEBUG:renogybt.BLEManager:BLEManager initialized for MAC: XX:XX:XX:XX:XX:XX, Alias: My Rover
+DEBUG:renogybt.BaseClient:Starting device discovery for 'My Rover'...
+INFO:renogybt.BLEManager:Starting BLE discovery for MAC 'XX:XX:XX:XX:XX:XX' or alias 'My Rover'...
+INFO:renogybt.BLEManager:Discovery finished. Found X devices.
+DEBUG:renogybt.BLEManager:Discovered devices: ['YY:YY:YY:YY:YY:Y1', 'XX:XX:XX:XX:XX:XX']
+INFO:renogybt.BLEManager:Found matching device: Name='My Rover', Address='XX:XX:XX:XX:XX:XX'
+DEBUG:renogybt.BaseClient:Device 'My Rover' found (XX:XX:XX:XX:XX:XX), attempting to connect...
+INFO:renogybt.BLEManager:Attempting to connect to device: XX:XX:XX:XX:XX:XX (Alias: My Rover)
+INFO:renogybt.BLEManager:Successfully connected to XX:XX:XX:XX:XX:XX. Client connected: True
+DEBUG:renogybt.BLEManager:Discovering services and characteristics...
+INFO:renogybt.BaseClient:Successfully connected to BLE device: XX:XX:XX:XX:XX:XX ('My Rover')
+INFO:renogybt.BaseClient:Reading section 0 for 'My Rover': Register 12, Words 8
+DEBUG:renogybt.BaseClient:Sending read request for 'My Rover', section 0 (Register: 12): [1, 3, 0, 12, 0, 8, <crc_bytes>]
+DEBUG:renogybt.BLEManager:Writing to characteristic <UUID_WRITE_CHAR> (Handle: <handle>): <payload_hex>
+INFO:renogybt.BLEManager:Characteristic write successful.
+DEBUG:renogybt.BaseClient:Raw data received by BaseClient for 'My Rover': <response_hex>
+DEBUG:renogybt.BaseClient:Parsed operation code for 'My Rover': 3
+INFO:renogybt.BaseClient:Read successful for 'My Rover', section 0 (Register: 12). Parsing...
+DEBUG:renogybt.RoverClient:Parsing device info for 'My Rover'...
+DEBUG:renogybt.BaseClient:Parsing device info (model) from response for 'My Rover'.
+DEBUG:renogybt.BaseClient:Parsed model for 'My Rover': RNG-CTRL-RVR40
+DEBUG:renogybt.RoverClient:Device info parsed for 'My Rover': Model='RNG-CTRL-RVR40'
+DEBUG:renogybt.BaseClient:Parser parse_device_info for 'My Rover' executed successfully.
+DEBUG:renogybt.BaseClient:Moving to next section 1 for 'My Rover'. Pausing briefly.
+INFO:renogybt.BaseClient:Reading section 1 for 'My Rover': Register 26, Words 1
+... (similar logs for other sections) ...
+INFO:renogybt.BaseClient:All sections parsed for 'My Rover'. Preparing data for callback.
+DEBUG:renogybt.BaseClient:Data for callback for 'My Rover': RoverData(model='RNG-CTRL-RVR40', device_id=1, function='READ', battery_percentage=87, ..., __device='My Rover', __client='RoverClient')
+INFO:example:Data from 'My Rover': {'model': 'RNG-CTRL-RVR40', 'device_id': 1, 'function': 'READ', ..., 'battery_percentage': 87, ...}
+INFO:renogybt.BaseClient:Polling disabled for 'My Rover'. Client will not initiate further reads.
+INFO:example:Client execution finished or was stopped by user/error.
+INFO:renogybt.BaseClient:Client for 'My Rover' has stopped.
+INFO:renogybt.BaseClient:Disconnecting from 'My Rover'...
+INFO:renogybt.BLEManager:Disconnecting from device: My Rover (XX:XX:XX:XX:XX:XX)
+INFO:renogybt.BLEManager:Successfully disconnected.
+INFO:renogybt.BaseClient:Disconnected from 'My Rover'.
+DEBUG:renogybt.BaseClient:Setting main future result to 'Disconnected' for 'My Rover'.
 ```
 
-**Have multiple devices in Hub mode?**
+The logged data structure for a Rover might look like this (when `log_level = DEBUG` in `config.ini` and no `fields` filter is applied, actual values will vary):
+```json
+{
+  "model": "RNG-CTRL-RVR40",
+  "device_id": 1,
+  "function": "READ",
+  "battery_percentage": 87,
+  "battery_voltage": 12.9,
+  "battery_current": 2.58,
+  "battery_temperature": 25.0,
+  "controller_temperature": 33.0,
+  "load_status": "off",
+  "load_voltage": 0.0,
+  "load_current": 0.0,
+  "load_power": 0,
+  "pv_voltage": 17.1,
+  "pv_current": 2.04,
+  "pv_power": 35,
+  "max_charging_power_today": 143,
+  "max_discharging_power_today": 0,
+  "charging_amp_hours_today": 34,
+  "discharging_amp_hours_today": 0,
+  "power_generation_today": 432,
+  "power_consumption_today": 0,
+  "power_generation_total": 426038,
+  "charging_status": "mppt",
+  "battery_type": "lithium",
+  "__device": "My Rover",
+  "__client": "RoverClient"
+}
+```
+Note: The `example.py` converts dataclasses to dictionaries for logging, so the above structure reflects that. The `__device` and `__client` fields are metadata added by the library.
+
+## Improved Error Handling
+The library now features more specific exception classes for better error handling in your application. You can import these from `renogybt.exceptions`:
+- `DeviceNotFoundError`: When the specified Bluetooth device cannot be found.
+- `ConnectionError`: For issues during the connection phase to an already discovered device.
+- `ReadTimeoutError`: If the device doesn't respond to a read command in time.
+- `InvalidResponseError`: If the device sends unexpected or malformed data.
+- `ConfigError`: For configuration-specific issues (though `ValueError` is often raised directly by `ConfigManager` for validation).
+- `RenogyBTError`: The base class for all library-specific exceptions.
+
+Your application can catch these specific exceptions to implement more granular error recovery or user feedback, similar to how `example.py` now logs them differently.
+
+## Have multiple devices in Hub mode?
 
 If you have multiple devices connected to a single BT-2 module (daisy chained or using [Communication Hub](https://www.renogy.com/communication-hub/)), you need to find out the individual device Id (aka address) of each of these devices. Below are some of the usual suspects:
 
@@ -90,7 +193,7 @@ If you have multiple devices connected to a single BT-2 module (daisy chained or
 
 ## Data logging
 
-Supports logging data to local MQTT brokers like [Mosquitto](https://mosquitto.org/) or [Home Assistant](https://www.home-assistant.io/) dashboards. You can also log it to third party cloud services like [PVOutput](https://pvoutput.org/). See [config.ini](https://github.com/cyrils/renogy-bt1/blob/main/config.ini) for more details. Note that free PVOutput accounts have a cap of one request per minute.
+Supports logging data to local MQTT brokers like [Mosquitto](https://mosquitto.org/) or [Home Assistant](https://www.home-assistant.io/) dashboards. You can also log it to third party cloud services like [PVOutput](https://pvoutput.org/). See the example `config.ini` structure above and the comments within for more details on configuring these sections. Note that free PVOutput accounts have a cap of one request per minute.
 
 Example config to add to your home assistant `configuration.yaml`:
 ```yaml
